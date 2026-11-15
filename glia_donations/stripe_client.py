@@ -14,11 +14,20 @@ import stripe
 _configured = False
 
 
+def _settings_record():
+	"""Stripe Settings is autonamed by gateway_name; the ERPNext Stripe gateway
+	looks it up via Payment Gateway.gateway_controller, which is "Stripe"."""
+	controller = frappe.db.get_value("Payment Gateway", {"gateway": "Stripe"}, "gateway_controller")
+	for candidate in (controller, "Stripe", "Stripe Settings"):
+		if candidate and frappe.db.exists("Stripe Settings", candidate):
+			return frappe.get_doc("Stripe Settings", candidate)
+	name = frappe.db.get_value("Stripe Settings", {}, "name")
+	return frappe.get_doc("Stripe Settings", name) if name else None
+
+
 def _secret_key() -> str:
-	record = frappe.db.get_value("Stripe Settings", {"name": "Stripe Settings"}, "name")
-	key = None
-	if record:
-		key = frappe.get_doc("Stripe Settings", record).get_password("secret_key", raise_exception=False)
+	record = _settings_record()
+	key = record.get_password("secret_key", raise_exception=False) if record else None
 	if not key:
 		key = frappe.conf.get("stripe_secret_key")
 	if not key:
