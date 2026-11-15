@@ -50,6 +50,16 @@ def _contact_email(invoice, order) -> str | None:
 	return (email or "").strip() or None
 
 
+def _invoice_already_recorded(invoice_name: str) -> bool:
+	"""A donation booked by glia_donations already represents this invoice.
+
+	Recurring charges are booked through the same machinery (Sales Invoice +
+	Payment Entry); without this guard the Payment Entry submit would be treated
+	as a fresh shop donation and create a duplicate Donation record.
+	"""
+	return bool(frappe.db.exists("Donation", {"sales_invoice": invoice_name}))
+
+
 def _already_recorded(payment_entry: str, invoice: str | None, item_code: str) -> bool:
 	filters = {"payment_entry": payment_entry, "item_code": item_code}
 	if invoice:
@@ -110,6 +120,8 @@ def _ratio(allocated, total):
 def from_invoice(payment_entry, invoice_name, allocated_amount):
 	invoice = frappe.get_doc("Sales Invoice", invoice_name)
 	if invoice.docstatus != 1:
+		return []
+	if _invoice_already_recorded(invoice.name):
 		return []
 	ratio = _ratio(allocated_amount, invoice.grand_total)
 	orders = {}

@@ -132,6 +132,11 @@ def book_donation(donation_name: str):
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()
 
+	# Link the donation to the invoice *before* the payment entry submit, so the
+	# shop's Payment Entry hook recognises this invoice as already recorded and
+	# does not create a duplicate Donation.
+	donation.db_set("sales_invoice", invoice.name, update_modified=False)
+
 	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
 	payment = get_payment_entry("Sales Invoice", invoice.name, party_amount=invoice.outstanding_amount)
@@ -146,9 +151,7 @@ def book_donation(donation_name: str):
 	payment.insert(ignore_permissions=True)
 	payment.submit()
 
-	donation.db_set(
-		{"sales_invoice": invoice.name, "payment_entry": payment.name}, update_modified=False
-	)
+	donation.db_set("payment_entry", payment.name, update_modified=False)
 	return {
 		"status": "booked",
 		"sales_invoice": invoice.name,
