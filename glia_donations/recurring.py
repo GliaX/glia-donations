@@ -125,9 +125,15 @@ def ensure_contact(email: str, full_name: str | None = None) -> str:
 	return contact.name
 
 
-def start(email: str, full_name: str | None, amount, currency: str | None = None,
-          campaign: str | None = None, frequency: str = "Monthly"):
-	"""Create a Pending Recurring Donation and a Stripe Checkout (subscription) URL."""
+def start(email: str | None = None, full_name: str | None = None, amount=0,
+          currency: str | None = None, campaign: str | None = None, frequency: str = "Monthly"):
+	"""Create a Stripe subscription checkout and return its URL.
+
+	No Recurring Donation row is required up front: Stripe Checkout collects the
+	donor's email and card, and the record is created when the payment completes
+	(or enriched immediately when an email is already known). The token in the
+	session metadata ties the two together and powers the manage page link.
+	"""
 	cfg = settings()
 	if not cfg.enabled:
 		frappe.throw("Recurring donations are not available right now.")
@@ -139,63 +145,109 @@ def start(email: str, full_name: str | None, amount, currency: str | None = None
 	stripe = configure()
 	value = _normalise_amount(amount)
 	currency = (currency or cfg.default_currency or "CAD").upper()
+	token = new_cancel_token()
 
+	doc = None
 	email = (email or "").strip()
-	full_name = (full_name or "").strip() or email.split("@")[0]
-	contact = ensure_contact(email, full_name)
-
-	doc = frappe.new_doc("Recurring Donation")
-	doc.update(
-		{
-			"donor_name": full_name,
-			"email": email,
-			"contact": contact,
-			"campaign": campaign or "",
-			"amount": value,
-			"currency": currency,
-			"frequency": frequency,
-			"status": "Pending",
-			"source": "Website",
-		}
-	)
-	doc.flags.ignore_permissions = True
-	doc.insert(ignore_permissions=True)
+	if email:
+		full_name = (full_name or "").strip() or email.split("@")[0]
+		doc = frappe.new_doc("Recurring Donation")
+		doc.update(
+			{
+				"donor_name": full_name,
+				"email": email,
+				"contact": ensure_contact(email, full_name),
+				"campaign": campaign or "",
+				"amount": value,
+				"currency": currency,
+				"frequency": frequency,
+				"status": "Pending",
+				"source": "Website",
+				"cancel_token": token,
+			}
+		)
+		doc.flags.ignore_permissions = True
+		doc.insert(ignore_permissions=True)
 
 	price_id = ensure_donation_price(value, currency)
 	base_url = get_url().rstrip("/")
-	token = doc.cancel_token
+	metadata = {
+		"token": token,
+		"amount": f"{value:.2f}",
+		"currency": currency,
+		"campaign": (campaign or "")[:450],
+	}
+	if doc:
+		metadata["recurring_donation"] = doc.name
+
 	session = stripe.checkout.Session.create(
 		mode="subscription",
 		line_items=[{"price": price_id, "quantity": 1}],
-		customer_email=email,
-		client_reference_id=doc.name,
+		customer_email=email or None,
+		client_reference_id=doc.name if doc else token,
 		success_url=(
 			f"{base_url}{cfg.success_path or '/recurring_donation'}"
 			f"?token={token}&session_id={{CHECKOUT_SESSION_ID}}"
 		),
 		cancel_url=f"{base_url}{cfg.cancel_path or '/recurring_donation'}?token={token}&status=cancelled",
-		metadata={"recurring_donation": doc.name, "token": token},
-		subscription_data={"metadata": {"recurring_donation": doc.name, "token": token}},
+		metadata=metadata,
+		subscription_data={"metadata": metadata},
 		allow_promotion_codes=False,
 		billing_address_collection="auto",
 	)
-	doc.db_set(
-		{
-			"stripe_checkout_session": session.id,
-			"stripe_price_id": price_id,
-			"notes": f"Checkout session created ({'live' if is_live() else 'test'} mode).",
-		},
-		update_modified=False,
-	)
+	if doc:
+		doc.db_set(
+			{
+				"stripe_checkout_session": session.id,
+				"stripe_price_id": price_id,
+				"notes": f"Checkout session created ({'live' if is_live() else 'test'} mode).",
+			},
+			update_modified=False,
+		)
 
 	return {
 		"url": session.url,
-		"recurring_donation": doc.name,
 		"token": token,
+		"recurring_donation": doc.name if doc else None,
 		"amount": value,
 		"currency": currency,
 		"live": is_live(),
 	}
+
+
+def create_from_checkout(session, token: str):
+	"""Create the Recurring Donation from a completed Stripe Checkout session."""
+	metadata = session.get("metadata") or {}
+	details = session.get("customer_details") or {}
+	email = (details.get("email") or session.get("customer_email") or "").strip()
+	if not email:
+		frappe.throw("Stripe checkout session has no donor email.")
+	name = (details.get("name") or "").strip() or email.split("@")[0]
+	amount = flt(metadata.get("amount"))
+	currency = (metadata.get("currency") or session.get("currency") or "CAD").upper()
+
+	doc = frappe.new_doc("Recurring Donation")
+	doc.update(
+		{
+			"donor_name": name,
+			"email": email,
+			"contact": ensure_contact(email, name),
+			"campaign": metadata.get("campaign") or "",
+			"amount": amount,
+			"currency": currency,
+			"frequency": "Monthly",
+			"status": "Active",
+			"source": "Website",
+			"cancel_token": token or new_cancel_token(),
+			"stripe_customer_id": session.get("customer") or "",
+			"stripe_subscription_id": session.get("subscription") or "",
+			"stripe_checkout_session": session.get("id") or "",
+			"start_date": frappe.utils.today(),
+		}
+	)
+	doc.flags.ignore_permissions = True
+	doc.insert(ignore_permissions=True)
+	return doc
 
 
 def by_token(token: str):

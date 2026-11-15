@@ -8,8 +8,8 @@ from glia_donations import recurring
 
 
 @frappe.whitelist(allow_guest=True)
-def start_recurring_donation(email, full_name=None, amount=0, currency=None, campaign=None,
-                             frequency="Monthly"):
+def start_recurring_donation(amount=0, currency=None, campaign=None, email=None,
+                             full_name=None, frequency="Monthly"):
 	"""Create the subscription checkout and return the Stripe URL."""
 	return recurring.start(
 		email=email,

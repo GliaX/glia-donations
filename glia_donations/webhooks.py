@@ -20,7 +20,7 @@ import frappe
 import stripe
 from frappe.utils import cint, flt, today
 
-from glia_donations.recurring import date_from_period_end, settings
+from glia_donations.recurring import create_from_checkout, date_from_period_end, settings
 from glia_donations.stripe_client import configure
 
 HANDLED_EVENTS = (
@@ -94,6 +94,11 @@ def _recurring_donation_from(obj):
 		name = obj.get("client_reference_id")
 	if name and frappe.db.exists("Recurring Donation", name):
 		return frappe.get_doc("Recurring Donation", name)
+	token = metadata.get("token") if isinstance(metadata, dict) else None
+	if token:
+		name = frappe.db.get_value("Recurring Donation", {"cancel_token": token}, "name")
+		if name:
+			return frappe.get_doc("Recurring Donation", name)
 	subscription_id = obj.get("subscription") or obj.get("id")
 	if subscription_id:
 		name = frappe.db.get_value(
@@ -107,7 +112,14 @@ def _recurring_donation_from(obj):
 def on_checkout_completed(session):
 	doc = _recurring_donation_from(session)
 	if not doc:
-		return {"skipped": "no recurring donation for session"}
+		metadata = session.get("metadata") or {}
+		token = metadata.get("token") if isinstance(metadata, dict) else None
+		if not token:
+			return {"skipped": "no recurring donation or token for session"}
+		doc = create_from_checkout(session, token)
+		frappe.logger("glia_donations").info(
+			f"Recurring donation {doc.name} created from checkout {session.get('id')}"
+		)
 
 	subscription_id = session.get("subscription")
 	period_end = None
