@@ -1,0 +1,145 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block page_content %}
+<div class="glia-recurring">
+	<div class="glia-recurring__card" id="glia-recurring-app"
+		data-token="{{ token }}"
+		data-status="{{ session_status }}">
+
+		{% if error %}
+			<h1>Monthly gift</h1>
+			<p class="glia-recurring__muted">{{ error }}</p>
+			<p><a class="glia-recurring__link" href="/">Back to Glia</a></p>
+
+		{% elif session_status == "cancelled" %}
+			<h1>No gift set up</h1>
+			<p class="glia-recurring__muted">
+				You left before finishing the monthly gift — nothing was charged.
+				You are welcome back any time.
+			</p>
+			<p><a class="glia-recurring__link" href="/">Back to Glia</a></p>
+
+		{% elif donation %}
+			<div id="glia-recurring-live" data-state="{{ donation.status }}">
+				{% if donation.status == "Pending" %}
+					<h1>Finishing your monthly gift…</h1>
+					<p class="glia-recurring__muted">
+						We are confirming your gift of
+						<strong>{{ donation.currency }} {{ "%.2f"|format(donation.amount) }}</strong>
+						with Stripe. This page updates as soon as the confirmation arrives.
+					</p>
+				{% elif donation.status == "Active" %}
+					<h1>Thank you{% if donation.donor_name %}, {{ donation.donor_name }}{% endif %}</h1>
+					<p class="glia-recurring__lead">
+						Your monthly gift of
+						<strong>{{ donation.currency }} {{ "%.2f"|format(donation.amount) }}</strong>
+						is active.
+					</p>
+					<dl class="glia-recurring__facts">
+						<dt>Started</dt><dd>{{ donation.start_date or "just now" }}</dd>
+						<dt>Next charge</dt><dd>{{ donation.next_charge_date or "in one month" }}</dd>
+						<dt>Gifts received</dt><dd>{{ donation.charges_count }}</dd>
+						<dt>Total given</dt>
+						<dd>{{ donation.currency }} {{ "%.2f"|format(donation.total_collected) }}</dd>
+					</dl>
+					<p class="glia-recurring__muted">
+						Monthly gifts keep our open-source medical devices and training free for
+						clinicians in low-resource settings. Thank you.
+					</p>
+					<button class="glia-recurring__cancel" id="glia-cancel-btn" type="button">
+						Cancel my monthly gift
+					</button>
+				{% elif donation.status == "Past Due" %}
+					<h1>We could not take this month's gift</h1>
+					<p class="glia-recurring__muted">
+						Your monthly gift of {{ donation.currency }} {{ "%.2f"|format(donation.amount) }}
+						could not be charged. Stripe will retry automatically; you can also update
+						the card by replying to your Stripe receipt email.
+					</p>
+					<button class="glia-recurring__cancel" id="glia-cancel-btn" type="button">
+						Cancel my monthly gift
+					</button>
+				{% elif donation.status in ("Cancelled", "Completed") %}
+					<h1>Your monthly gift is stopped</h1>
+					<p class="glia-recurring__muted">
+						No further gifts will be charged. You have given
+						<strong>{{ donation.currency }} {{ "%.2f"|format(donation.total_collected) }}</strong>
+						across {{ donation.charges_count }} gift(s) — thank you.
+					</p>
+					<p><a class="glia-recurring__link" href="/support-glias-mission">Give again</a></p>
+				{% endif %}
+			</div>
+		{% endif %}
+	</div>
+</div>
+
+<style>
+.glia-recurring { max-width: 640px; margin: 56px auto 96px; padding: 0 20px; }
+.glia-recurring__card { background: #f7f9fa; border-radius: 18px; padding: 40px clamp(20px, 4vw, 44px); }
+.glia-recurring h1 { font-size: clamp(24px, 3vw, 34px); color: #032e38; margin: 0 0 14px; }
+.glia-recurring__lead { font-size: 20px; color: #032e38; margin: 0 0 22px; }
+.glia-recurring__muted { color: #5b6b70; line-height: 1.6; }
+.glia-recurring__facts { display: grid; grid-template-columns: auto 1fr; gap: 8px 24px; margin: 0 0 24px; }
+.glia-recurring__facts dt { color: #5b6b70; }
+.glia-recurring__facts dd { margin: 0; color: #032e38; font-weight: 600; }
+.glia-recurring__cancel {
+	background: none; border: 1px solid #c8d2d4; border-radius: 8px; color: #5b6b70;
+	cursor: pointer; font: inherit; padding: 10px 18px;
+}
+.glia-recurring__cancel:hover { border-color: #00a89f; color: #00a89f; }
+.glia-recurring__link { color: #00a89f; text-decoration: underline; text-underline-offset: 3px; }
+.glia-recurring__error { color: #b3261e; }
+</style>
+
+<script>
+(function () {
+	var app = document.getElementById("glia-recurring-app");
+	if (!app) return;
+	var token = app.dataset.token;
+	var live = document.getElementById("glia-recurring-live");
+
+	function poll(attempt) {
+		if (!live || !token) return;
+		if (live.dataset.state !== "Pending" || attempt > 20) return;
+		frappe.call({
+			method: "glia_donations.api.recurring_donation_status",
+			args: { token: token },
+			callback: function (r) {
+				var d = r.message;
+				if (d && d.status !== "Pending") {
+					window.location.reload();
+					return;
+				}
+				setTimeout(function () { poll(attempt + 1); }, 3000);
+			},
+			error: function () {
+				setTimeout(function () { poll(attempt + 1); }, 5000);
+			}
+		});
+	}
+
+	var cancelBtn = document.getElementById("glia-cancel-btn");
+	if (cancelBtn) {
+		cancelBtn.addEventListener("click", function () {
+			if (!window.confirm("Cancel your monthly gift to Glia?")) return;
+			cancelBtn.disabled = true;
+			cancelBtn.textContent = "Cancelling…";
+			frappe.call({
+				method: "glia_donations.api.cancel_recurring_donation",
+				args: { token: token, reason: "Cancelled by donor on the website" },
+				callback: function () { window.location.reload(); },
+				error: function () {
+					cancelBtn.disabled = false;
+					cancelBtn.textContent = "Cancel my monthly gift";
+					alert("We could not cancel just now — please email info@glia.org and we will stop it for you.");
+				}
+			});
+		});
+	}
+
+	poll(0);
+})();
+</script>
+{% endblock %}

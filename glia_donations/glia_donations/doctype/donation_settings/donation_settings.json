@@ -1,0 +1,158 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-15 02:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "column_break_main",
+  "default_currency",
+  "gift_limits_section",
+  "min_amount",
+  "max_amount",
+  "column_break_limits",
+  "price_lookup_prefix",
+  "stripe_section",
+  "stripe_webhook_secret",
+  "donation_product_name",
+  "pages_section",
+  "success_path",
+  "column_break_pages",
+  "cancel_path",
+  "receipt_section",
+  "send_receipt"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Recurring donations enabled"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "CAD",
+   "fieldname": "default_currency",
+   "fieldtype": "Link",
+   "label": "Default Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "gift_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Gift Limits"
+  },
+  {
+   "default": "1",
+   "fieldname": "min_amount",
+   "fieldtype": "Currency",
+   "label": "Minimum Monthly Amount",
+   "options": "default_currency"
+  },
+  {
+   "default": "5000",
+   "fieldname": "max_amount",
+   "fieldtype": "Currency",
+   "label": "Maximum Monthly Amount",
+   "options": "default_currency"
+  },
+  {
+   "fieldname": "column_break_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "glia_monthly",
+   "description": "Stripe Prices are reused by lookup key: &lt;prefix&gt;_&lt;currency&gt;_&lt;amount_minor_units&gt;.",
+   "fieldname": "price_lookup_prefix",
+   "fieldtype": "Data",
+   "label": "Stripe Price Lookup Prefix"
+  },
+  {
+   "fieldname": "stripe_section",
+   "fieldtype": "Section Break",
+   "label": "Stripe"
+  },
+  {
+   "description": "Signing secret (whsec_\u2026) from the Stripe webhook endpoint. The endpoint URL is /api/method/glia_donations.webhooks.stripe_webhook.",
+   "fieldname": "stripe_webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Signing Secret"
+  },
+  {
+   "default": "Glia Donation",
+   "description": "Stripe Product reused for every monthly Price.",
+   "fieldname": "donation_product_name",
+   "fieldtype": "Data",
+   "label": "Stripe Product Name"
+  },
+  {
+   "fieldname": "pages_section",
+   "fieldtype": "Section Break",
+   "label": "Pages"
+  },
+  {
+   "default": "/recurring_donation",
+   "fieldname": "success_path",
+   "fieldtype": "Data",
+   "label": "Success Page Path"
+  },
+  {
+   "fieldname": "column_break_pages",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "/recurring_donation",
+   "fieldname": "cancel_path",
+   "fieldtype": "Data",
+   "label": "Cancel Page Path"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "receipt_section",
+   "fieldtype": "Section Break",
+   "label": "Receipts"
+  },
+  {
+   "default": "0",
+   "fieldname": "send_receipt",
+   "fieldtype": "Check",
+   "label": "Email a receipt on each successful charge"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-15 02:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Glia Donations",
+ "name": "Donation Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Accounts Manager",
+   "write": 1
+  }
+ ],
+ "quick_entry": 0,
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
