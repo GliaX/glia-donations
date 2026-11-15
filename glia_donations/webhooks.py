@@ -188,7 +188,7 @@ def on_invoice_paid(invoice):
 			"currency": currency,
 			"donation_type": "Recurring",
 			"campaign": doc.campaign or "",
-			"financial_status": "paid",
+			"financial_status": "PAID",
 			"stripe_invoice_id": invoice_id,
 			"recurring_donation": doc.name,
 			"stripe_payment_intent": invoice.get("payment_intent") or "",
