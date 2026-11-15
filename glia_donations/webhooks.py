@@ -18,6 +18,7 @@ import frappe
 import stripe
 from frappe.utils import cint, flt, today
 
+from glia_donations.booking import book_safely
 from glia_donations.recurring import create_from_checkout, date_from_period_end, settings
 from glia_donations.stripe_client import configure
 
@@ -211,7 +212,13 @@ def on_invoice_paid(invoice):
 	doc.save(ignore_permissions=True)
 
 	_send_receipt(doc, donation, invoice_id)
-	return {"recurring_donation": doc.name, "donation": donation.name, "amount": amount}
+	booking = book_safely(donation.name)
+	return {
+		"recurring_donation": doc.name,
+		"donation": donation.name,
+		"amount": amount,
+		"booking": booking.get("status"),
+	}
 
 
 def on_invoice_failed(invoice):

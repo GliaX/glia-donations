@@ -22,7 +22,15 @@
   "column_break_pages",
   "cancel_path",
   "receipt_section",
-  "send_receipt"
+  "send_receipt",
+  "booking_section",
+  "booking_enabled",
+  "company",
+  "donation_item",
+  "column_break_booking",
+  "donation_income_account",
+  "mode_of_payment",
+  "stripe_payment_account"
  ],
  "fields": [
   {
@@ -122,6 +130,55 @@
    "fieldname": "send_receipt",
    "fieldtype": "Check",
    "label": "Email a receipt on each successful charge"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "booking_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting (ledger booking)"
+  },
+  {
+   "default": "0",
+   "description": "When on, each paid recurring charge creates a Sales Invoice + Payment Entry using the accounts below.",
+   "fieldname": "booking_enabled",
+   "fieldtype": "Check",
+   "label": "Book charges to the ledger"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "description": "A plain (non-variant), non-stock Item used for booked donations.",
+   "fieldname": "donation_item",
+   "fieldtype": "Link",
+   "label": "Donation Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "column_break_booking",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "donation_income_account",
+   "fieldtype": "Link",
+   "label": "Donation Income Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
+   "description": "Bank/clearing account the Stripe payout lands in.",
+   "fieldname": "stripe_payment_account",
+   "fieldtype": "Link",
+   "label": "Stripe Payment Account",
+   "options": "Account"
   }
  ],
  "index_web_pages_for_search": 0,
