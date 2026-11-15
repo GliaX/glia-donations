@@ -14,8 +14,6 @@ each one looks up state before writing.
 
 from __future__ import annotations
 
-import json
-
 import frappe
 import stripe
 from frappe.utils import cint, flt, today
@@ -248,33 +246,16 @@ def on_subscription_deleted(subscription):
 
 
 def _send_receipt(recurring, donation, invoice_id):
+	"""Queue the receipt on the worker; SMTP failures must never fail the webhook."""
 	cfg = settings()
 	if not cfg.send_receipt:
 		return
 	try:
-		frappe.sendmail(
-			recipients=[recurring.email],
-			subject=f"Thank you for your monthly gift to Glia ({donation.currency} {flt(donation.amount):.2f})",
-			message=_receipt_html(recurring, donation),
-			reference_doctype="Donation",
-			reference_name=donation.name,
-			now=True,
+		frappe.enqueue(
+			"glia_donations.emails.send_receipt_email",
+			queue="short",
+			donation_name=donation.name,
+			enqueue_after_commit=True,
 		)
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), f"Recurring donation receipt failed ({invoice_id})")
-
-
-def _receipt_html(recurring, donation):
-	currency = donation.currency
-	amount = f"{currency} {flt(donation.amount):.2f}"
-	return f"""
-	<div style="font-family:Ubuntu,Arial,sans-serif;color:#032e38;max-width:560px">
-	  <h2 style="margin:0 0 12px">Thank you, {frappe.utils.escape_html(recurring.donor_name)}</h2>
-	  <p>Your monthly gift of <strong>{amount}</strong> to Glia was received on {donation.donation_date}.</p>
-	  <p>It funds open-source medical devices and training for clinicians working in
-	  low-resource settings — thank you for making that possible.</p>
-	  <p style="color:#5b6b70;font-size:13px">You can pause or cancel any time here:
-	  <a href="{frappe.utils.get_url()}/recurring_donation?token={recurring.cancel_token}">manage your monthly gift</a>.</p>
-	  <p style="color:#5b6b70;font-size:13px">Glia · info@glia.org · https://glia.org</p>
-	</div>
-	"""
+		frappe.log_error(frappe.get_traceback(), f"Recurring donation receipt queue failed ({invoice_id})")
