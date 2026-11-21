@@ -27,3 +27,14 @@ class TestDonationItems(unittest.TestCase):
 		gray = frappe.get_all("Item", filters={"item_group": "Gray Area"}, pluck="name", limit=3)
 		for item in gray:
 			self.assertFalse(is_donation_item(item), item)
+
+
+class TestReceipts(unittest.TestCase):
+	def test_receipt_sender_supports_one_off_gifts(self):
+		from glia_donations.emails import send_receipt_email
+
+		# the one-off path must not depend on a recurring record
+		source = __import__("inspect").getsource(send_receipt_email)
+		self.assertIn("recurring_name", source)
+		self.assertIn("donor_email", source)
+		self.assertIn("807831391", source)

@@ -175,6 +175,14 @@ def on_payment_entry_submit(doc, method=None):
 			frappe.logger("glia_donations").info(
 				f"Payment Entry {doc.name}: created {len(created)} donation record(s): {', '.join(created)}"
 			)
+			# receipt after commit, on the worker: mail trouble must never undo a payment
+			for donation_name in created:
+				frappe.enqueue(
+					"glia_donations.emails.send_receipt_email",
+					donation_name=donation_name,
+					queue="short",
+					enqueue_after_commit=True,
+				)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), f"Donation from payment entry {doc.name}")
 
