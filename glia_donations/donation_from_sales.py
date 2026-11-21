@@ -81,6 +81,11 @@ def _make_donation(payment_entry, invoice, order, item, amount):
 
 	contact = ensure_contact(email, (invoice or order).customer_name)
 	template = _template_of(item.item_code)
+	# the shop records which project a gift was meant for on the order line
+	campaign_note = ""
+	for note in (item.get("additional_notes") or "", ):
+		if note.startswith("campaign:"):
+			campaign_note = note.split("campaign:", 1)[1].strip()[:140]
 	donation = frappe.new_doc("Donation")
 	donation.update(
 		{
@@ -92,7 +97,7 @@ def _make_donation(payment_entry, invoice, order, item, amount):
 			"amount": amount,
 			"currency": payment_entry.paid_to_account_currency or invoice.currency,
 			"donation_type": "One-time",
-			"campaign": (frappe.db.get_value("Item", template, "item_name") or template)[:140],
+			"campaign": campaign_note or (frappe.db.get_value("Item", template, "item_name") or template)[:140],
 			"tier": (item.get("item_name") or item.item_code)[:140],
 			"financial_status": FINANCIAL_STATUS_PAID,
 			"payment_entry": payment_entry.name,
